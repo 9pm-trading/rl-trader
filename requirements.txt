@@ -1,0 +1,15 @@
+cycler==0.12.1
+joblib==1.4.2
+kiwisolver==1.4.5
+matplotlib==3.2.1
+mysql-connector-python==8.0.16
+numpy==1.19.5
+pandas==1.0.4
+protobuf==5.27.3
+pyparsing==3.1.2
+python-dateutil==2.9.0.post0
+pytz==2024.1
+scikit-learn==0.23.1
+scipy==1.10.1
+six==1.16.0
+threadpoolctl==3.5.0

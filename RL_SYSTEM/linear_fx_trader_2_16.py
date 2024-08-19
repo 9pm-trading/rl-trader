@@ -18,8 +18,8 @@ import mysql.connector
 
 mydb = mysql.connector.connect(
   host="localhost",
-  user="root",
-  passwd="",
+  user="luxeave",
+  passwd="jakarta08",
   database="mt4"
 )
 
@@ -339,7 +339,7 @@ class MultiStockEnv:
         reward = cur_val - prev_val
         print('reward', reward)
 
-        sys.exit()
+        # sys.exit()
 
         done = 0
 
@@ -1070,7 +1070,7 @@ if __name__ == '__main__':
     local_timestamp = 0
 
     if args.mode == 'real': # REAL TIME RL HERE
-        import archived.db as db
+        import db as db
         while True:
             now = datetime.now()
             if now.minute>=0 and now.minute<11:
