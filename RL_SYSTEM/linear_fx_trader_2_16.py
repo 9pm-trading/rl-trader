@@ -1,21 +1,20 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
 from datetime import datetime
 import itertools
 import argparse
 import re
 import os
 import pickle
-
-from sklearn.preprocessing import StandardScaler
-
 import sys
 import time
-import mysql.connector 
-#import datetime
 
+from sklearn.preprocessing import StandardScaler
+import mysql.connector 
+
+
+# Database connection setup
 mydb = mysql.connector.connect(
   host="localhost",
   user="luxeave",
@@ -24,19 +23,16 @@ mydb = mysql.connector.connect(
 )
 
 print(mydb)
-
 np.seterr(over='ignore')
 
+
+# Data loading and preprocessing functions
 def get_data():
     df = pd.read_csv('EUR.csv')
-    #print( list(df.columns) )
     return df
-    #return df.values
+
 
 def get_scaler(env):
-    # return scikit-learn scaler object to scale the states
-    # Note: you could also populate the replay buffer here
-
     states = []
     for _ in range(env.n_step):
         action = np.random.choice(env.action_space)
@@ -49,87 +45,41 @@ def get_scaler(env):
     scaler.fit(states)
     return scaler
 
+
 def maybe_make_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
 
-
+# Linear Model Class Definition
 class LinearModel:
-    """ A linear regression model """
     def __init__(self, input_dim, n_action):
         self.W = np.random.randn(input_dim, n_action) / np.sqrt(input_dim)
         self.b = np.zeros(n_action)
-
-        # momentum terms
         self.vW = 0
         self.vb = 0
-
         self.losses = []
 
     def predict(self, X):
-        # make sure X is N x D
-
-        #print('X:',X, 'X.shape' , X.shape)
         assert(len(X.shape) == 2)
-
         prediction = X.dot(self.W) + self.b
-
-        #print('prediction:', prediction)
-        #print('prediction[0]', prediction[0])
-        #print('prediction.shape', prediction.shape) # 1, 27
-        #sys.exit()
-
         return prediction
-        #return X.dot(self.W) + self.b
 
     def sgd(self, X, Y, learning_rate=0.01, momentum=0.9):
-        # make sure X is N x D
         assert(len(X.shape) == 2)
-
-        # the loss values are 2-D
-        # normally we would divide by N only
-        # but now we divide by N x K
-
-        #print('Y.shape', Y.shape)
         num_values = np.prod(Y.shape)
-
-        #print('num_values', num_values)
-
-        # do one step of gradient descent
-        # we multiply by 2 to get the exact gradient
-        # (not adjusting the learning rate)
-        # i.e. d/dx (x^2) --> 2x
-
-        #print(X.dtype)
-        #sys.exit()
-
-        #print('performing prediction using X')
         Yhat = self.predict(X)
-
-        #print('predicted result Yhat', Yhat)
-
-        #print('performing loss function')
         gW = 2 * X.T.dot(Yhat - Y) / num_values
         gb = 2 * (Yhat - Y).sum(axis=0) / num_values
-
-        #print('updating momentum terms')
-        # update momentum terms
+        
         self.vW = momentum * self.vW - learning_rate * gW
         self.vb = momentum * self.vb - learning_rate * gb
-
-        #print('updating W and b')
-        # update params
+        
         self.W += self.vW
         self.b += self.vb
-
+        
         mse = np.mean((Yhat - Y)**2)
-
-        #print('mse', mse)
-
         self.losses.append(mse)
-
-        #sys.exit()
 
     def load_weights(self, filepath):
         npz = np.load(filepath)
@@ -139,8 +89,9 @@ class LinearModel:
     def save_weights(self, filepath):
         np.savez(filepath, W=self.W, b=self.b)
 
-class MultiStockEnv:
 
+# Trading Environment Class
+class MultiStockEnv:
     def __init__(self, data, initial_investment=10000, target=50, dd=20, step_pt=0.002):
         # data
         self.stock_price_history = data
@@ -748,8 +699,9 @@ class MultiStockEnv:
             self.sl_price_buy_2 = self.op_price_buy_2 - self.step_pt
             print(f'SB2 OP:{self.op_price_buy_2:.5f} {self.lot_buy_2:.2f} lot')
             # ESTABLISH TRAIL BEP FOR LV1 & LV2 - IF 1 STEP BEHIND
-            if self.delta(self.sl_price_buy_2,self.sl_price_buy_1)>0.5*self.step_pt:
-                self.sl_price_buy_1 = self.op_price_buy_1
+            if self.delta(self.op_price_buy_2,self.op_price_buy_1)>0.5*self.step_pt:
+                self.op_price_buy_1 = self.op_price_buy_2 - self.step_pt
+                self.sl_price_buy_1 = self.op_price_buy_1 - self.step_pt
                 print(f'SB1 TRAILED BEP')
             # TRAIL GRID SELL UP
             self.grid_sell_up(self.op_price_buy_1)
@@ -759,11 +711,13 @@ class MultiStockEnv:
             self.sl_price_buy_3 = self.op_price_buy_3 - self.step_pt
             print(f'SB3 OP:{self.op_price_buy_3:.5f} {self.lot_buy_3:.2f} lot')
             # ESTABLISH TRAIL BEP FOR LV1 & LV2 IF 1 STEP BEHIND
-            if self.delta(self.sl_price_buy_3,self.sl_price_buy_2)>0.5*self.step_pt:
-                self.sl_price_buy_2 = self.op_price_buy_2
+            if self.delta(self.op_price_buy_3,self.op_price_buy_2)>0.5*self.step_pt:
+                self.op_price_buy_2 = self.op_price_buy_3 - self.step_pt
+                self.sl_price_buy_2 = self.op_price_buy_2 - self.step_pt
                 print(f'SB2 TRAILED BEP')
-            if self.delta(self.sl_price_buy_3,self.sl_price_buy_1)>0.5*self.step_pt:
-                self.sl_price_buy_1 = self.op_price_buy_1
+            if self.delta(self.op_price_buy_3,self.op_price_buy_1)>0.5*self.step_pt:
+                self.op_price_buy_1 = self.op_price_buy_3 - self.step_pt
+                self.sl_price_buy_1 = self.op_price_buy_1 - self.step_pt
                 print(f'SB1 TRAILED BEP')
             # TRAIL GRID SELL UP
             self.grid_sell_up(self.op_price_buy_2)
@@ -782,8 +736,9 @@ class MultiStockEnv:
             self.sl_price_sell_2 = self.op_price_sell_2 + self.step_pt
             print(f'SS2 OP:{self.op_price_sell_2:.5f} {self.lot_sell_2:.2f} lot') 
             # ESTABLISH TRAIL BEP FOR LV1 & LV2 - BELUM TENTU - ONLY IF PRICE IS BEHIND 1 LV
-            if self.delta(self.sl_price_sell_1,self.sl_price_sell_2)>0.5*self.step_pt:
-                self.sl_price_sell_1 = self.op_price_sell_1
+            if self.delta(self.op_price_sell_2,self.op_price_sell_1)>0.5*self.step_pt:
+                self.op_price_sell_1 = self.op_price_sell_2 + self.step_pt
+                self.sl_price_sell_1 = self.op_price_sell_1 + self.step_pt
                 print(f'SS1 TRAILED BEP')
             # TRAIL GRID BUY DOWN
             self.grid_buy_down(self.op_price_sell_1)
@@ -793,11 +748,13 @@ class MultiStockEnv:
             self.sl_price_sell_3 = self.op_price_sell_3 + self.step_pt 
             print(f'SS3 OP:{self.op_price_sell_3:.5f} {self.lot_sell_3:.2f} lot')
             # ESTABLISH TRAIL BEP FOR LV1 & LV2 - IF A STEP BEHIND
-            if self.delta(self.sl_price_sell_3,self.sl_price_sell_2)>0.5*self.step_pt:
-                self.sl_price_sell_2 = self.op_price_sell_2
+            if self.delta(self.op_price_sell_3,self.op_price_sell_2)>0.5*self.step_pt:
+                self.op_price_sell_2 = self.op_price_sell_3 + self.step_pt
+                self.sl_price_sell_2 = self.op_price_sell_2 + self.step_pt
                 print(f'SS2 TRAILED BEP')
-            if self.delta(self.sl_price_sell_3,self.sl_price_sell_1)>0.5*self.step_pt:
-                self.sl_price_sell_1 = self.op_price_sell_1
+            if self.delta(self.op_price_sell_3,self.op_price_sell_1)>0.5*self.step_pt:
+                self.op_price_sell_1 = self.op_price_sell_3 + self.step_pt
+                self.sl_price_sell_1 = self.op_price_sell_1 + self.step_pt
                 print(f'SS1 TRAILED BEP')
             # TRAIL GRID BUY DOWN
             self.grid_buy_down(self.op_price_sell_2)
